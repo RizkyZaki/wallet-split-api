@@ -33,7 +33,15 @@ Tidak ada konfigurasi tambahan. Data hanya tersimpan di memori dan akan
 hilang setiap kali server dijalankan ulang. Port dapat diubah dengan
 `PORT=4000 npm start`.
 
-## Coba dalam 60 detik
+## Coba dengan Postman
+
+Import `postman_collection.json` (File → Import). Collection berisi satu
+request per endpoint dengan contoh payload. Setelah membuat user atau
+expense, salin `id` dari response ke variabel collection `userId`, `userId2`,
+dan `expenseId` (klik nama collection → tab Variables) agar request
+berikutnya bisa langsung dijalankan.
+
+## Coba dengan curl
 
 Skrip berikut mencakup semua fitur. ID dibuat oleh server, jadi ambil dari
 response (contoh di bawah memakai `jq`, tetapi alat lain juga bisa).
@@ -228,4 +236,5 @@ tests/
   money.test.js                 # unit test helper uang
   splitEqually.test.js          # unit test distribusi sisa sen
 Dockerfile, compose.yaml        # build container dan menjalankan dengan satu perintah
+postman_collection.json         # satu request per endpoint, siap import
 ```

@@ -1,0 +1,103 @@
+{
+  "info": {
+    "name": "Wallet API",
+    "description": "Isi variabel collection `userId`, `userId2`, dan `expenseId` dengan ID dari response setelah membuat user / expense.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "userId", "value": "" },
+    { "key": "userId2", "value": "" },
+    { "key": "expenseId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Buat wallet",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Alice\",\n  \"initialBalance\": 100\n}"
+        }
+      }
+    },
+    {
+      "name": "Top-up saldo",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/users/{{userId}}/topup",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 50\n}"
+        }
+      }
+    },
+    {
+      "name": "Cek saldo",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/users/{{userId}}/balance"
+      }
+    },
+    {
+      "name": "Transfer antar-user",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/transfers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fromUserId\": \"{{userId}}\",\n  \"toUserId\": \"{{userId2}}\",\n  \"amount\": 25\n}"
+        }
+      }
+    },
+    {
+      "name": "Buat group expense (equal split)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/expenses",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payerId\": \"{{userId}}\",\n  \"participantIds\": [\"{{userId}}\", \"{{userId2}}\"],\n  \"totalAmount\": 10,\n  \"splitType\": \"equal\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Buat group expense (custom split)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/expenses",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"payerId\": \"{{userId}}\",\n  \"participantIds\": [\"{{userId}}\", \"{{userId2}}\"],\n  \"totalAmount\": 30,\n  \"splitType\": \"custom\",\n  \"splits\": [\n    { \"userId\": \"{{userId}}\", \"amount\": 20 },\n    { \"userId\": \"{{userId2}}\", \"amount\": 10 }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Lihat expense",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/expenses/{{expenseId}}"
+      }
+    },
+    {
+      "name": "Riwayat transaksi",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/users/{{userId}}/transactions"
+      }
+    }
+  ]
+}
