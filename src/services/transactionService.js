@@ -1,13 +1,6 @@
 const { transactions, generateId } = require("../store");
 
-/**
- * Appends an immutable entry to the transaction log. Every operation that
- * changes (or, for EXPENSE_SHARE, merely concerns) a user's balance goes
- * through here so that transaction history has a single source of truth.
- *
- * `balanceAfter` is the user's balance right after this entry was applied,
- * or null for informational entries that don't move money.
- */
+// Append-only log. `balanceAfter` is null for entries that do not move money.
 function recordTransaction({ type, userId, amount, relatedUserId = null, balanceAfter = null, description }) {
   const tx = {
     id: generateId("tx"),
@@ -23,11 +16,7 @@ function recordTransaction({ type, userId, amount, relatedUserId = null, balance
   return tx;
 }
 
-/**
- * Returns all entries for one user in chronological order. The store is a
- * Map, which preserves insertion order, and entries are only ever appended,
- * so insertion order *is* chronological order.
- */
+// Map preserves insertion order, so this is already chronological.
 function getTransactionsForUser(userId) {
   return Array.from(transactions.values()).filter((tx) => tx.userId === userId);
 }

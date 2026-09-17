@@ -1,23 +1,12 @@
 const crypto = require("crypto");
 
-/**
- * Single in-memory store, intentionally kept as plain Maps.
- *
- * This is NOT persisted anywhere on purpose (per the assignment's
- * "Database: in-memory" constraint) - restarting the process wipes
- * all data. Services are the only code allowed to touch these maps
- * directly, so the storage layer could later be swapped for a real
- * database without touching route/controller code.
- */
-const users = new Map(); // id -> { id, name, balance }
-const transactions = new Map(); // id -> { id, type, userId, amount, relatedUserId, balanceAfter, description, createdAt }
-const expenses = new Map(); // id -> { id, payerId, participantIds, totalAmount, splitType, splits, createdAt }
+// In-memory storage, per the assignment. Only services touch these maps.
+const users = new Map();
+const transactions = new Map();
+const expenses = new Map();
 
-function generateId(prefix) {
-  return `${prefix}_${crypto.randomUUID()}`;
-}
+const generateId = (prefix) => `${prefix}_${crypto.randomUUID()}`;
 
-/** Wipes all data. Used between test cases so tests don't leak state. */
 function reset() {
   users.clear();
   transactions.clear();

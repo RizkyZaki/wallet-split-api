@@ -1,33 +1,32 @@
 const { users, generateId } = require("../store");
 const AppError = require("../errors/AppError");
 const money = require("../utils/money");
+const { assertAmount, assertNonEmptyString } = require("../utils/validation");
 const { recordTransaction, getTransactionsForUser } = require("./transactionService");
 
-/** Throws if the user doesn't exist; otherwise returns the user record. */
 function getUserOrThrow(userId) {
   const user = users.get(userId);
-  if (!user) {
-    throw new AppError(`User '${userId}' does not exist`, 404);
-  }
+  if (!user) throw new AppError(`User '${userId}' does not exist`, 404);
   return user;
 }
 
-function createUser({ name, initialBalance = 0 }) {
-  if (typeof name !== "string" || name.trim().length === 0) {
-    throw new AppError("'name' is required and must be a non-empty string", 400);
+function assertCanDebit(user, amount) {
+  if (money.lessThan(user.balance, amount)) {
+    throw new AppError(`Insufficient balance: user '${user.id}' has ${user.balance}, needs ${amount}`);
   }
-  if (initialBalance !== 0 && !money.isValidAmount(initialBalance)) {
-    throw new AppError(
-      "'initialBalance' must be a positive number with at most 2 decimal places (or omitted for 0)",
-      400
-    );
-  }
+}
 
-  const user = {
-    id: generateId("user"),
-    name: name.trim(),
-    balance: initialBalance,
-  };
+function assertCanCredit(user, amount) {
+  if (money.wouldOverflow(user.balance, amount)) {
+    throw new AppError(`Balance of user '${user.id}' would exceed the maximum supported amount`);
+  }
+}
+
+function createUser({ name, initialBalance = 0 }) {
+  assertNonEmptyString(name, "name");
+  if (initialBalance !== 0) assertAmount(initialBalance, "initialBalance");
+
+  const user = { id: generateId("user"), name: name.trim(), balance: initialBalance };
   users.set(user.id, user);
 
   if (initialBalance > 0) {
@@ -39,22 +38,15 @@ function createUser({ name, initialBalance = 0 }) {
       description: "Initial wallet balance",
     });
   }
-
   return user;
 }
 
 function topUp(userId, amount) {
-  if (!money.isValidAmount(amount)) {
-    throw new AppError("'amount' must be a positive number with at most 2 decimal places", 400);
-  }
+  assertAmount(amount, "amount");
   const user = getUserOrThrow(userId);
-
-  if (money.wouldOverflow(user.balance, amount)) {
-    throw new AppError("Top-up would exceed the maximum supported balance", 400);
-  }
+  assertCanCredit(user, amount);
 
   user.balance = money.add(user.balance, amount);
-
   return recordTransaction({
     type: "TOP_UP",
     userId: user.id,
@@ -70,8 +62,16 @@ function getBalance(userId) {
 }
 
 function getTransactionHistory(userId) {
-  getUserOrThrow(userId); // ensures 404 for unknown users
+  getUserOrThrow(userId);
   return getTransactionsForUser(userId);
 }
 
-module.exports = { getUserOrThrow, createUser, topUp, getBalance, getTransactionHistory };
+module.exports = {
+  getUserOrThrow,
+  assertCanDebit,
+  assertCanCredit,
+  createUser,
+  topUp,
+  getBalance,
+  getTransactionHistory,
+};
