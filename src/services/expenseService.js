@@ -85,12 +85,13 @@ function createExpense({ payerId, participantIds, totalAmount, splitType = "equa
     description: `Paid group expense (${participantIds.length} participants)`,
   });
   for (const share of resolvedSplits) {
+    const isPayer = share.userId === payer.id;
     recordTransaction({
       type: "EXPENSE_SHARE",
       userId: share.userId,
       amount: share.amount,
-      relatedUserId: payer.id,
-      description: `Owes ${payer.name} for shared expense`,
+      relatedUserId: isPayer ? null : payer.id,
+      description: isPayer ? "Own share of group expense" : `Owes ${payer.name} for shared expense`,
     });
   }
 

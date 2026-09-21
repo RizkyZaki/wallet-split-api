@@ -186,7 +186,9 @@ berupa integer yang presisi.
 tagihan (seperti membayar bill restoran), sehingga `totalAmount` langsung
 dipotong dari wallet payer. Bagian tiap participant dicatat di riwayat
 transaksinya sebagai entry `EXPENSE_SHARE` ("owes Alice for shared expense"),
-tetapi **tidak** otomatis dipotong dari wallet mereka.
+tetapi **tidak** otomatis dipotong dari wallet mereka. Bagian payer sendiri
+juga dicatat ("own share of group expense", tanpa `relatedUserId`) agar
+riwayatnya menunjukkan berapa dari total yang memang porsinya.
 
 Dengan demikian "mencatat expense" dan "melunasi utang" adalah dua langkah
 terpisah: pelunasan dilakukan lewat `POST /api/transfers` biasa ke payer.

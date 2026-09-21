@@ -202,6 +202,16 @@ describe("Group expenses - equal split", () => {
       amount: 20,
       relatedUserId: payer.id,
       balanceAfter: null,
+      description: "Owes Payer for shared expense",
+    });
+
+    // The payer's own share is not a debt to anyone
+    const payerHistory = await request(app).get(`/api/users/${payer.id}/transactions`);
+    const ownShare = payerHistory.body.find((t) => t.type === "EXPENSE_SHARE");
+    expect(ownShare).toMatchObject({
+      amount: 20,
+      relatedUserId: null,
+      description: "Own share of group expense",
     });
   });
 
