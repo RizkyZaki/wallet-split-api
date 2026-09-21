@@ -93,6 +93,18 @@
       }
     },
     {
+      "name": "Lunasi bagian expense (transfer + expenseId)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/transfers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fromUserId\": \"{{userId2}}\",\n  \"toUserId\": \"{{userId}}\",\n  \"amount\": 5,\n  \"expenseId\": \"{{expenseId}}\"\n}"
+        }
+      }
+    },
+    {
       "name": "Lihat expense",
       "request": {
         "method": "GET",

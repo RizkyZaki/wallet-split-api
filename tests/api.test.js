@@ -286,14 +286,89 @@ describe("Group expenses - equal split", () => {
   });
 });
 
+describe("Expense settlement (transfer with expenseId)", () => {
+  async function setupExpense() {
+    const alice = await createUser("Alice", 100);
+    const bob = await createUser("Bob", 50);
+    const carol = await createUser("Carol", 100);
+    // Alice pays 30 split three ways -> Bob and Carol each owe Alice 10
+    const expense = await request(app).post("/api/expenses").send({
+      payerId: alice.id,
+      participantIds: [alice.id, bob.id, carol.id],
+      totalAmount: 30,
+    });
+    return { alice, bob, carol, expenseId: expense.body.id };
+  }
+
+  test("accepts partial payments up to the outstanding share, then rejects more", async () => {
+    const { alice, bob, expenseId } = await setupExpense();
+
+    const first = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 4, expenseId });
+    expect(first.status).toBe(200);
+    expect(first.body.expenseId).toBe(expenseId);
+
+    const second = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 6, expenseId });
+    expect(second.status).toBe(200);
+
+    const third = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 1, expenseId });
+    expect(third.status).toBe(400);
+    expect(third.body.error).toMatch(/already fully settled/i);
+  });
+
+  test("rejects a payment that exceeds the outstanding share", async () => {
+    const { alice, bob, expenseId } = await setupExpense();
+    const res = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 10.01, expenseId });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/exceeds the outstanding share/i);
+  });
+
+  test("rejects settlement to someone other than the payer", async () => {
+    const { bob, carol, expenseId } = await setupExpense();
+    const res = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: carol.id, amount: 5, expenseId });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/must be the payer/i);
+  });
+
+  test("rejects settlement from a non-participant", async () => {
+    const { alice, expenseId } = await setupExpense();
+    const dave = await createUser("Dave", 50);
+    const res = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: dave.id, toUserId: alice.id, amount: 5, expenseId });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not a participant/i);
+  });
+
+  test("404s for an unknown expense and leaves balances untouched", async () => {
+    const { alice, bob } = await setupExpense();
+    const res = await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 5, expenseId: "exp_nope" });
+    expect(res.status).toBe(404);
+
+    const bobBalance = await request(app).get(`/api/users/${bob.id}/balance`);
+    expect(bobBalance.body.balance).toBe(50);
+  });
+});
+
 describe("Debts", () => {
-  test("groups shares by payer and nets them against transfers back", async () => {
+  test("groups shares by payer and nets them against settlement transfers only", async () => {
     const alice = await createUser("Alice", 100);
     const bob = await createUser("Bob", 50);
     const carol = await createUser("Carol", 100);
 
     // Alice pays 30 split three ways -> Bob owes Alice 10
-    await request(app).post("/api/expenses").send({
+    const exp1 = await request(app).post("/api/expenses").send({
       payerId: alice.id,
       participantIds: [alice.id, bob.id, carol.id],
       totalAmount: 30,
@@ -304,8 +379,12 @@ describe("Debts", () => {
       participantIds: [carol.id, bob.id],
       totalAmount: 20,
     });
-    // Bob repays Alice 4
-    await request(app).post("/api/transfers").send({ fromUserId: bob.id, toUserId: alice.id, amount: 4 });
+    // Bob settles 4 of his share to Alice
+    await request(app)
+      .post("/api/transfers")
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 4, expenseId: exp1.body.id });
+    // A plain transfer to Carol is not a settlement
+    await request(app).post("/api/transfers").send({ fromUserId: bob.id, toUserId: carol.id, amount: 3 });
 
     const res = await request(app).get(`/api/users/${bob.id}/debts`);
     expect(res.status).toBe(200);

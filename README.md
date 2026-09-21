@@ -26,7 +26,7 @@ npm start
 ```bash
 npm install
 npm test
-# Test Suites: 3 passed, Tests: 42 passed
+# Test Suites: 3 passed, Tests: 47 passed
 ```
 
 Tidak ada konfigurasi tambahan. Data hanya tersimpan di memori dan akan
@@ -104,6 +104,15 @@ Response `200` berisi record transaksi, termasuk `balanceAfter`.
 ```
 Response `200` berisi saldo terbaru kedua user.
 
+Untuk **melunasi bagian dari group expense**, sertakan `expenseId`:
+```json
+{ "fromUserId": "user_...", "toUserId": "user_...", "amount": 10, "expenseId": "exp_..." }
+```
+Transfer seperti ini divalidasi sebagai pelunasan: `toUserId` harus payer
+expense tersebut, `fromUserId` harus participant, dan `amount` tidak boleh
+melebihi sisa bagian yang belum dibayar (boleh dicicil). Transfer tanpa
+`expenseId` adalah transfer biasa dan tidak dihitung sebagai pelunasan.
+
 ### Membuat group expense
 
 `POST /api/expenses`
@@ -147,8 +156,9 @@ perhitungan.
     ]
   }
   ```
-  `owed` = total bagian dari group expense, `settled` = total transfer yang
-  sudah dikirim ke payer tersebut, `outstanding` = sisa yang belum dibayar.
+  `owed` = total bagian dari group expense, `settled` = total transfer
+  pelunasan (yang menyertakan `expenseId`) ke payer tersebut, `outstanding` =
+  sisa yang belum dibayar.
 - `GET /api/expenses/:id`
 - `GET /health`
 
@@ -171,6 +181,8 @@ internal yang tidak terduga.
 - Custom split harus memuat setiap participant tepat satu kali, dan totalnya
   harus sama dengan total expense.
 - User tidak dapat mentransfer ke dirinya sendiri.
+- Transfer dengan `expenseId` harus ditujukan ke payer expense tersebut, berasal
+  dari participant, dan tidak melebihi sisa bagian yang belum dibayar.
 
 ## Keputusan desain
 
@@ -191,10 +203,11 @@ juga dicatat ("own share of group expense", tanpa `relatedUserId`) agar
 riwayatnya menunjukkan berapa dari total yang memang porsinya.
 
 Dengan demikian "mencatat expense" dan "melunasi utang" adalah dua langkah
-terpisah: pelunasan dilakukan lewat `POST /api/transfers` biasa ke payer.
-`GET /api/users/:id/debts` merangkum keduanya: bagian yang tercatat dikurangi
-transfer yang sudah dikirim ke payer, sehingga user bisa melihat sisa utangnya
-tanpa membaca riwayat satu per satu.
+terpisah: pelunasan dilakukan lewat `POST /api/transfers` dengan `expenseId`.
+Transfer yang membawa `expenseId` diperlakukan sebagai pelunasan dan divalidasi
+terhadap sisa bagian participant, sehingga tidak mungkin membayar lebih dari
+yang terutang; transfer biasa tanpa `expenseId` tidak menyentuh hitungan utang.
+`GET /api/users/:id/debts` merangkum keduanya per payer.
 Pendekatan ini dipilih karena spesifikasi hanya mensyaratkan pengecekan saldo
 *payer*, bukan tiap participant; auto-debit participant yang saldonya kosong
 akan gagal dengan cara yang tidak dijelaskan spesifikasi. Payer tidak wajib
@@ -242,7 +255,7 @@ src/
   errors/AppError.js
   services/
     userService.js              # create, top-up, saldo, riwayat, utang, cek debit/kredit
-    walletService.js            # transfer
+    walletService.js            # transfer + pelunasan expense
     expenseService.js           # group expense, equal/custom split
     transactionService.js       # transaction log append-only
   controllers/                  # adapter HTTP tipis di atas service

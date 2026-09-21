@@ -70,23 +70,25 @@ function getTransactionHistory(userId) {
   return getTransactionsForUser(userId);
 }
 
-// Debts are EXPENSE_SHARE entries grouped by payer (excluding the user's own
-// share when they were the payer), netted against transfers already sent to
-// that payer. Transfers are the only settlement mechanism, so any transfer to
-// a payer counts as repayment.
+// Debts are EXPENSE_SHARE entries grouped by payer (the user's own share as
+// payer has no relatedUserId and is skipped), netted against settlement
+// transfers - TRANSFER_OUT entries that carry an expenseId. Plain transfers
+// are not counted.
 function getDebts(userId) {
   getUserOrThrow(userId);
   const byPayer = new Map();
 
   for (const tx of getTransactionsForUser(userId)) {
-    const other = tx.relatedUserId;
-    if (!other || other === userId) continue;
+    const payerId = tx.relatedUserId;
+    if (!payerId) continue;
 
-    if (tx.type === "EXPENSE_SHARE" || tx.type === "TRANSFER_OUT") {
-      const entry = byPayer.get(other) || { owed: [], settled: [] };
-      (tx.type === "EXPENSE_SHARE" ? entry.owed : entry.settled).push(tx.amount);
-      byPayer.set(other, entry);
-    }
+    const isShare = tx.type === "EXPENSE_SHARE";
+    const isSettlement = tx.type === "TRANSFER_OUT" && tx.expenseId !== null;
+    if (!isShare && !isSettlement) continue;
+
+    const entry = byPayer.get(payerId) || { owed: [], settled: [] };
+    (isShare ? entry.owed : entry.settled).push(tx.amount);
+    byPayer.set(payerId, entry);
   }
 
   const debts = [];
@@ -99,7 +101,7 @@ function getDebts(userId) {
       toUserName: users.get(toUserId).name,
       owed,
       settled,
-      outstanding: money.lessThan(owed, settled) ? 0 : money.subtract(owed, settled),
+      outstanding: money.subtract(owed, settled),
     });
   }
 

@@ -1,7 +1,16 @@
 const { transactions, generateId } = require("../store");
 
-// Append-only log. `balanceAfter` is null for entries that do not move money.
-function recordTransaction({ type, userId, amount, relatedUserId = null, balanceAfter = null, description }) {
+// Append-only log. `balanceAfter` is null for entries that do not move money;
+// `expenseId` is set on transfers that settle a group expense share.
+function recordTransaction({
+  type,
+  userId,
+  amount,
+  relatedUserId = null,
+  balanceAfter = null,
+  expenseId = null,
+  description,
+}) {
   const tx = {
     id: generateId("tx"),
     type,
@@ -9,6 +18,7 @@ function recordTransaction({ type, userId, amount, relatedUserId = null, balance
     amount,
     relatedUserId,
     balanceAfter,
+    expenseId,
     description,
     createdAt: new Date().toISOString(),
   };
