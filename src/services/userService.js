@@ -56,6 +56,10 @@ function topUp(userId, amount) {
   });
 }
 
+function listUsers() {
+  return Array.from(users.values());
+}
+
 function getBalance(userId) {
   const user = getUserOrThrow(userId);
   return { userId: user.id, name: user.name, balance: user.balance };
@@ -71,6 +75,7 @@ module.exports = {
   assertCanDebit,
   assertCanCredit,
   createUser,
+  listUsers,
   topUp,
   getBalance,
   getTransactionHistory,

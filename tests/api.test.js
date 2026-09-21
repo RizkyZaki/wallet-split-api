@@ -20,6 +20,22 @@ describe("Wallet creation & top-up", () => {
     expect(res.body).toMatchObject({ name: "Alice", balance: 100 });
   });
 
+  test("lists all users in creation order", async () => {
+    const empty = await request(app).get("/api/users");
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual([]);
+
+    const alice = await createUser("Alice", 100);
+    const bob = await createUser("Bob", 0);
+
+    const res = await request(app).get("/api/users");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { id: alice.id, name: "Alice", balance: 100 },
+      { id: bob.id, name: "Bob", balance: 0 },
+    ]);
+  });
+
   test("rejects a missing name", async () => {
     const res = await request(app).post("/api/users").send({ initialBalance: 50 });
     expect(res.status).toBe(400);

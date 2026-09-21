@@ -31,6 +31,13 @@
       }
     },
     {
+      "name": "Daftar user",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/users"
+      }
+    },
+    {
       "name": "Top-up saldo",
       "request": {
         "method": "POST",

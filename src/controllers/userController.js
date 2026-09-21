@@ -6,6 +6,10 @@ function createUser(req, res) {
   res.status(201).json(user);
 }
 
+function listUsers(req, res) {
+  res.status(200).json(userService.listUsers());
+}
+
 function topUp(req, res) {
   const { id } = req.params;
   const { amount } = req.body || {};
@@ -28,4 +32,4 @@ function transfer(req, res) {
   res.status(200).json(result);
 }
 
-module.exports = { createUser, topUp, getBalance, getTransactions, transfer };
+module.exports = { createUser, listUsers, topUp, getBalance, getTransactions, transfer };

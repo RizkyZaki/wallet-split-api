@@ -26,7 +26,7 @@ npm start
 ```bash
 npm install
 npm test
-# Test Suites: 3 passed, Tests: 38 passed
+# Test Suites: 3 passed, Tests: 39 passed
 ```
 
 Tidak ada konfigurasi tambahan. Data hanya tersimpan di memori dan akan
@@ -135,6 +135,7 @@ perhitungan.
 
 ### Endpoint pembacaan data
 
+- `GET /api/users` – daftar semua user beserta saldonya
 - `GET /api/users/:id/balance`
 - `GET /api/users/:id/transactions` – riwayat transaksi user, urut kronologis
 - `GET /api/expenses/:id`
