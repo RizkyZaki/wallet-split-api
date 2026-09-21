@@ -27,9 +27,13 @@ function getTransactions(req, res) {
   res.status(200).json(history);
 }
 
+function getDebts(req, res) {
+  res.status(200).json(userService.getDebts(req.params.id));
+}
+
 function transfer(req, res) {
   const result = walletService.transfer(req.body || {});
   res.status(200).json(result);
 }
 
-module.exports = { createUser, listUsers, topUp, getBalance, getTransactions, transfer };
+module.exports = { createUser, listUsers, topUp, getBalance, getTransactions, getDebts, transfer };

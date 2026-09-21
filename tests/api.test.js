@@ -276,6 +276,57 @@ describe("Group expenses - equal split", () => {
   });
 });
 
+describe("Debts", () => {
+  test("groups shares by payer and nets them against transfers back", async () => {
+    const alice = await createUser("Alice", 100);
+    const bob = await createUser("Bob", 50);
+    const carol = await createUser("Carol", 100);
+
+    // Alice pays 30 split three ways -> Bob owes Alice 10
+    await request(app).post("/api/expenses").send({
+      payerId: alice.id,
+      participantIds: [alice.id, bob.id, carol.id],
+      totalAmount: 30,
+    });
+    // Carol pays 20 split with Bob -> Bob owes Carol 10
+    await request(app).post("/api/expenses").send({
+      payerId: carol.id,
+      participantIds: [carol.id, bob.id],
+      totalAmount: 20,
+    });
+    // Bob repays Alice 4
+    await request(app).post("/api/transfers").send({ fromUserId: bob.id, toUserId: alice.id, amount: 4 });
+
+    const res = await request(app).get(`/api/users/${bob.id}/debts`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      userId: bob.id,
+      debts: [
+        { toUserId: alice.id, toUserName: "Alice", owed: 10, settled: 4, outstanding: 6 },
+        { toUserId: carol.id, toUserName: "Carol", owed: 10, settled: 0, outstanding: 10 },
+      ],
+    });
+  });
+
+  test("excludes the payer's own share and returns an empty list when nothing is owed", async () => {
+    const alice = await createUser("Alice", 100);
+    const bob = await createUser("Bob", 0);
+    await request(app).post("/api/expenses").send({
+      payerId: alice.id,
+      participantIds: [alice.id, bob.id],
+      totalAmount: 10,
+    });
+
+    const res = await request(app).get(`/api/users/${alice.id}/debts`);
+    expect(res.body).toEqual({ userId: alice.id, debts: [] });
+  });
+
+  test("404s for an unknown user", async () => {
+    const res = await request(app).get("/api/users/ghost/debts");
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("Group expenses - custom split", () => {
   test("accepts a custom split whose amounts sum to the total", async () => {
     const payer = await createUser("Payer", 100);

@@ -70,6 +70,42 @@ function getTransactionHistory(userId) {
   return getTransactionsForUser(userId);
 }
 
+// Debts are EXPENSE_SHARE entries grouped by payer (excluding the user's own
+// share when they were the payer), netted against transfers already sent to
+// that payer. Transfers are the only settlement mechanism, so any transfer to
+// a payer counts as repayment.
+function getDebts(userId) {
+  getUserOrThrow(userId);
+  const byPayer = new Map();
+
+  for (const tx of getTransactionsForUser(userId)) {
+    const other = tx.relatedUserId;
+    if (!other || other === userId) continue;
+
+    if (tx.type === "EXPENSE_SHARE" || tx.type === "TRANSFER_OUT") {
+      const entry = byPayer.get(other) || { owed: [], settled: [] };
+      (tx.type === "EXPENSE_SHARE" ? entry.owed : entry.settled).push(tx.amount);
+      byPayer.set(other, entry);
+    }
+  }
+
+  const debts = [];
+  for (const [toUserId, entry] of byPayer) {
+    if (entry.owed.length === 0) continue;
+    const owed = money.sum(entry.owed);
+    const settled = money.sum(entry.settled);
+    debts.push({
+      toUserId,
+      toUserName: users.get(toUserId).name,
+      owed,
+      settled,
+      outstanding: money.lessThan(owed, settled) ? 0 : money.subtract(owed, settled),
+    });
+  }
+
+  return { userId, debts };
+}
+
 module.exports = {
   getUserOrThrow,
   assertCanDebit,
@@ -79,4 +115,5 @@ module.exports = {
   topUp,
   getBalance,
   getTransactionHistory,
+  getDebts,
 };

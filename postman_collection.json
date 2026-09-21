@@ -105,6 +105,13 @@
         "method": "GET",
         "url": "{{baseUrl}}/api/users/{{userId}}/transactions"
       }
+    },
+    {
+      "name": "Ringkasan utang",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/users/{{userId2}}/debts"
+      }
     }
   ]
 }

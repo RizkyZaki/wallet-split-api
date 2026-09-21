@@ -26,7 +26,7 @@ npm start
 ```bash
 npm install
 npm test
-# Test Suites: 3 passed, Tests: 39 passed
+# Test Suites: 3 passed, Tests: 42 passed
 ```
 
 Tidak ada konfigurasi tambahan. Data hanya tersimpan di memori dan akan
@@ -138,6 +138,17 @@ perhitungan.
 - `GET /api/users` – daftar semua user beserta saldonya
 - `GET /api/users/:id/balance`
 - `GET /api/users/:id/transactions` – riwayat transaksi user, urut kronologis
+- `GET /api/users/:id/debts` – ringkasan utang user ke tiap payer:
+  ```json
+  {
+    "userId": "user_...",
+    "debts": [
+      { "toUserId": "user_...", "toUserName": "Alice", "owed": 10, "settled": 4, "outstanding": 6 }
+    ]
+  }
+  ```
+  `owed` = total bagian dari group expense, `settled` = total transfer yang
+  sudah dikirim ke payer tersebut, `outstanding` = sisa yang belum dibayar.
 - `GET /api/expenses/:id`
 - `GET /health`
 
@@ -179,6 +190,9 @@ tetapi **tidak** otomatis dipotong dari wallet mereka.
 
 Dengan demikian "mencatat expense" dan "melunasi utang" adalah dua langkah
 terpisah: pelunasan dilakukan lewat `POST /api/transfers` biasa ke payer.
+`GET /api/users/:id/debts` merangkum keduanya: bagian yang tercatat dikurangi
+transfer yang sudah dikirim ke payer, sehingga user bisa melihat sisa utangnya
+tanpa membaca riwayat satu per satu.
 Pendekatan ini dipilih karena spesifikasi hanya mensyaratkan pengecekan saldo
 *payer*, bukan tiap participant; auto-debit participant yang saldonya kosong
 akan gagal dengan cara yang tidak dijelaskan spesifikasi. Payer tidak wajib
@@ -225,7 +239,7 @@ src/
     validation.js               # assertion input yang dipakai bersama
   errors/AppError.js
   services/
-    userService.js              # create, top-up, saldo, riwayat, cek debit/kredit
+    userService.js              # create, top-up, saldo, riwayat, utang, cek debit/kredit
     walletService.js            # transfer
     expenseService.js           # group expense, equal/custom split
     transactionService.js       # transaction log append-only
