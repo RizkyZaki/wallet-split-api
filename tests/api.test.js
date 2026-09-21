@@ -362,24 +362,30 @@ describe("Expense settlement (transfer with expenseId)", () => {
 });
 
 describe("Debts", () => {
-  test("groups shares by payer and nets them against settlement transfers only", async () => {
-    const alice = await createUser("Alice", 100);
+  test("lists one debt per expense, netted against settlements for that expense only", async () => {
+    const alice = await createUser("Alice", 200);
     const bob = await createUser("Bob", 50);
     const carol = await createUser("Carol", 100);
 
-    // Alice pays 30 split three ways -> Bob owes Alice 10
+    // Alice pays 30 split three ways -> Bob owes Alice 10 (exp1)
     const exp1 = await request(app).post("/api/expenses").send({
       payerId: alice.id,
       participantIds: [alice.id, bob.id, carol.id],
       totalAmount: 30,
     });
-    // Carol pays 20 split with Bob -> Bob owes Carol 10
-    await request(app).post("/api/expenses").send({
+    // Alice pays another 40 split with Bob -> Bob owes Alice 20 (exp2)
+    const exp2 = await request(app).post("/api/expenses").send({
+      payerId: alice.id,
+      participantIds: [alice.id, bob.id],
+      totalAmount: 40,
+    });
+    // Carol pays 20 split with Bob -> Bob owes Carol 10 (exp3)
+    const exp3 = await request(app).post("/api/expenses").send({
       payerId: carol.id,
       participantIds: [carol.id, bob.id],
       totalAmount: 20,
     });
-    // Bob settles 4 of his share to Alice
+    // Bob settles 4 of exp1 only
     await request(app)
       .post("/api/transfers")
       .send({ fromUserId: bob.id, toUserId: alice.id, amount: 4, expenseId: exp1.body.id });
@@ -390,9 +396,11 @@ describe("Debts", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       userId: bob.id,
+      totalOutstanding: 36,
       debts: [
-        { toUserId: alice.id, toUserName: "Alice", owed: 10, settled: 4, outstanding: 6 },
-        { toUserId: carol.id, toUserName: "Carol", owed: 10, settled: 0, outstanding: 10 },
+        { expenseId: exp1.body.id, toUserId: alice.id, toUserName: "Alice", owed: 10, settled: 4, outstanding: 6 },
+        { expenseId: exp2.body.id, toUserId: alice.id, toUserName: "Alice", owed: 20, settled: 0, outstanding: 20 },
+        { expenseId: exp3.body.id, toUserId: carol.id, toUserName: "Carol", owed: 10, settled: 0, outstanding: 10 },
       ],
     });
   });
@@ -407,7 +415,7 @@ describe("Debts", () => {
     });
 
     const res = await request(app).get(`/api/users/${alice.id}/debts`);
-    expect(res.body).toEqual({ userId: alice.id, debts: [] });
+    expect(res.body).toEqual({ userId: alice.id, totalOutstanding: 0, debts: [] });
   });
 
   test("404s for an unknown user", async () => {

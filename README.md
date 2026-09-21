@@ -147,18 +147,26 @@ perhitungan.
 - `GET /api/users` – daftar semua user beserta saldonya
 - `GET /api/users/:id/balance`
 - `GET /api/users/:id/transactions` – riwayat transaksi user, urut kronologis
-- `GET /api/users/:id/debts` – ringkasan utang user ke tiap payer:
+- `GET /api/users/:id/debts` – daftar utang user, satu baris per expense:
   ```json
   {
     "userId": "user_...",
+    "totalOutstanding": 6,
     "debts": [
-      { "toUserId": "user_...", "toUserName": "Alice", "owed": 10, "settled": 4, "outstanding": 6 }
+      {
+        "expenseId": "exp_...",
+        "toUserId": "user_...",
+        "toUserName": "Alice",
+        "owed": 10,
+        "settled": 4,
+        "outstanding": 6
+      }
     ]
   }
   ```
-  `owed` = total bagian dari group expense, `settled` = total transfer
-  pelunasan (yang menyertakan `expenseId`) ke payer tersebut, `outstanding` =
-  sisa yang belum dibayar.
+  `owed` = bagian user di expense tersebut, `settled` = total transfer
+  pelunasan yang menyertakan `expenseId` itu, `outstanding` = sisa yang belum
+  dibayar.
 - `GET /api/expenses/:id`
 - `GET /health`
 
@@ -207,7 +215,7 @@ terpisah: pelunasan dilakukan lewat `POST /api/transfers` dengan `expenseId`.
 Transfer yang membawa `expenseId` diperlakukan sebagai pelunasan dan divalidasi
 terhadap sisa bagian participant, sehingga tidak mungkin membayar lebih dari
 yang terutang; transfer biasa tanpa `expenseId` tidak menyentuh hitungan utang.
-`GET /api/users/:id/debts` merangkum keduanya per payer.
+`GET /api/users/:id/debts` merangkum keduanya per expense.
 Pendekatan ini dipilih karena spesifikasi hanya mensyaratkan pengecekan saldo
 *payer*, bukan tiap participant; auto-debit participant yang saldonya kosong
 akan gagal dengan cara yang tidak dijelaskan spesifikasi. Payer tidak wajib

@@ -74,27 +74,6 @@ function createExpense({ payerId, participantIds, totalAmount, splitType = "equa
       ? splitEqually(totalAmount, participantIds)
       : resolveCustomSplits(splits, participantIds, totalAmount);
 
-  // The payer fronts the whole bill. Participants' shares are recorded as
-  // what they owe, not auto-debited - see README "Design decisions".
-  payer.balance = money.subtract(payer.balance, totalAmount);
-  recordTransaction({
-    type: "EXPENSE_PAID",
-    userId: payer.id,
-    amount: totalAmount,
-    balanceAfter: payer.balance,
-    description: `Paid group expense (${participantIds.length} participants)`,
-  });
-  for (const share of resolvedSplits) {
-    const isPayer = share.userId === payer.id;
-    recordTransaction({
-      type: "EXPENSE_SHARE",
-      userId: share.userId,
-      amount: share.amount,
-      relatedUserId: isPayer ? null : payer.id,
-      description: isPayer ? "Own share of group expense" : `Owes ${payer.name} for shared expense`,
-    });
-  }
-
   const expense = {
     id: generateId("exp"),
     payerId: payer.id,
@@ -104,6 +83,30 @@ function createExpense({ payerId, participantIds, totalAmount, splitType = "equa
     splits: resolvedSplits,
     createdAt: new Date().toISOString(),
   };
+
+  // The payer fronts the whole bill. Participants' shares are recorded as
+  // what they owe, not auto-debited - see README "Design decisions".
+  payer.balance = money.subtract(payer.balance, totalAmount);
+  recordTransaction({
+    type: "EXPENSE_PAID",
+    userId: payer.id,
+    amount: totalAmount,
+    balanceAfter: payer.balance,
+    expenseId: expense.id,
+    description: `Paid group expense (${participantIds.length} participants)`,
+  });
+  for (const share of resolvedSplits) {
+    const isPayer = share.userId === payer.id;
+    recordTransaction({
+      type: "EXPENSE_SHARE",
+      userId: share.userId,
+      amount: share.amount,
+      relatedUserId: isPayer ? null : payer.id,
+      expenseId: expense.id,
+      description: isPayer ? "Own share of group expense" : `Owes ${payer.name} for shared expense`,
+    });
+  }
+
   expenses.set(expense.id, expense);
   return expense;
 }

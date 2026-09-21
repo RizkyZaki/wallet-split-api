@@ -70,42 +70,42 @@ function getTransactionHistory(userId) {
   return getTransactionsForUser(userId);
 }
 
-// Debts are EXPENSE_SHARE entries grouped by payer (the user's own share as
-// payer has no relatedUserId and is skipped), netted against settlement
-// transfers - TRANSFER_OUT entries that carry an expenseId. Plain transfers
-// are not counted.
+// One debt per expense the user took part in (their own share as payer has
+// no relatedUserId and is skipped), netted against settlement transfers -
+// TRANSFER_OUT entries carrying the same expenseId. Plain transfers are not
+// counted.
 function getDebts(userId) {
   getUserOrThrow(userId);
-  const byPayer = new Map();
+  const byExpense = new Map();
 
   for (const tx of getTransactionsForUser(userId)) {
-    const payerId = tx.relatedUserId;
-    if (!payerId) continue;
+    if (!tx.expenseId || !tx.relatedUserId) continue;
 
-    const isShare = tx.type === "EXPENSE_SHARE";
-    const isSettlement = tx.type === "TRANSFER_OUT" && tx.expenseId !== null;
-    if (!isShare && !isSettlement) continue;
-
-    const entry = byPayer.get(payerId) || { owed: [], settled: [] };
-    (isShare ? entry.owed : entry.settled).push(tx.amount);
-    byPayer.set(payerId, entry);
+    if (tx.type === "EXPENSE_SHARE") {
+      byExpense.set(tx.expenseId, { toUserId: tx.relatedUserId, owed: tx.amount, settled: [] });
+    } else if (tx.type === "TRANSFER_OUT") {
+      byExpense.get(tx.expenseId).settled.push(tx.amount);
+    }
   }
 
   const debts = [];
-  for (const [toUserId, entry] of byPayer) {
-    if (entry.owed.length === 0) continue;
-    const owed = money.sum(entry.owed);
+  for (const [expenseId, entry] of byExpense) {
     const settled = money.sum(entry.settled);
     debts.push({
-      toUserId,
-      toUserName: users.get(toUserId).name,
-      owed,
+      expenseId,
+      toUserId: entry.toUserId,
+      toUserName: users.get(entry.toUserId).name,
+      owed: entry.owed,
       settled,
-      outstanding: money.subtract(owed, settled),
+      outstanding: money.subtract(entry.owed, settled),
     });
   }
 
-  return { userId, debts };
+  return {
+    userId,
+    totalOutstanding: money.sum(debts.map((d) => d.outstanding)),
+    debts,
+  };
 }
 
 module.exports = {
