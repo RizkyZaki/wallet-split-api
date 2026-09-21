@@ -10,27 +10,48 @@ beforeEach(() => {
 
 async function createUser(name, initialBalance = 0) {
   const res = await request(app).post("/api/users").send({ name, initialBalance });
-  return res.body;
+  return res.body.data;
 }
+
+describe("Response envelope", () => {
+  test("wraps successful responses in { success: true, data }", async () => {
+    const res = await request(app).get("/health");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { status: "ok" } });
+  });
+
+  test("wraps errors in { success: false, error }", async () => {
+    const res = await request(app).get("/api/users/ghost/balance");
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ success: false, error: "User 'ghost' does not exist" });
+  });
+
+  test("returns 404 in the same envelope for unknown routes", async () => {
+    const res = await request(app).get("/api/nope");
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ success: false, error: "Not found" });
+  });
+});
 
 describe("Wallet creation & top-up", () => {
   test("creates a user with an initial balance", async () => {
     const res = await request(app).post("/api/users").send({ name: "Alice", initialBalance: 100 });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ name: "Alice", balance: 100 });
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toMatchObject({ name: "Alice", balance: 100 });
   });
 
   test("lists all users in creation order", async () => {
     const empty = await request(app).get("/api/users");
     expect(empty.status).toBe(200);
-    expect(empty.body).toEqual([]);
+    expect(empty.body.data).toEqual([]);
 
     const alice = await createUser("Alice", 100);
     const bob = await createUser("Bob", 0);
 
     const res = await request(app).get("/api/users");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([
+    expect(res.body.data).toEqual([
       { id: alice.id, name: "Alice", balance: 100 },
       { id: bob.id, name: "Bob", balance: 0 },
     ]);
@@ -45,7 +66,7 @@ describe("Wallet creation & top-up", () => {
     const alice = await createUser("Alice", 100);
     const res = await request(app).post(`/api/users/${alice.id}/topup`).send({ amount: 50 });
     expect(res.status).toBe(200);
-    expect(res.body.balanceAfter).toBe(150);
+    expect(res.body.data.balanceAfter).toBe(150);
   });
 
   test("rejects a non-positive top-up amount", async () => {
@@ -70,7 +91,7 @@ describe("Wallet creation & top-up", () => {
     await request(app).post(`/api/users/${alice.id}/topup`).send({ amount: 0.1 });
     await request(app).post(`/api/users/${alice.id}/topup`).send({ amount: 0.2 });
     const res = await request(app).get(`/api/users/${alice.id}/balance`);
-    expect(res.body.balance).toBe(0.3);
+    expect(res.body.data.balance).toBe(0.3);
   });
 
   test("returns 400 for a malformed JSON body", async () => {
@@ -92,8 +113,8 @@ describe("Transaction history", () => {
 
     const res = await request(app).get(`/api/users/${alice.id}/transactions`);
     expect(res.status).toBe(200);
-    expect(res.body.map((t) => t.type)).toEqual(["INITIAL_BALANCE", "TOP_UP", "TRANSFER_OUT"]);
-    expect(res.body.map((t) => t.balanceAfter)).toEqual([100, 150, 120]);
+    expect(res.body.data.map((t) => t.type)).toEqual(["INITIAL_BALANCE", "TOP_UP", "TRANSFER_OUT"]);
+    expect(res.body.data.map((t) => t.balanceAfter)).toEqual([100, 150, 120]);
   });
 
   test("404s for an unknown user", async () => {
@@ -112,13 +133,13 @@ describe("Transfers", () => {
       .send({ fromUserId: alice.id, toUserId: bob.id, amount: 40 });
 
     expect(res.status).toBe(200);
-    expect(res.body.senderBalance).toBe(60);
-    expect(res.body.receiverBalance).toBe(40);
+    expect(res.body.data.senderBalance).toBe(60);
+    expect(res.body.data.receiverBalance).toBe(40);
 
     const aliceHistory = await request(app).get(`/api/users/${alice.id}/transactions`);
     const bobHistory = await request(app).get(`/api/users/${bob.id}/transactions`);
-    expect(aliceHistory.body.some((t) => t.type === "TRANSFER_OUT")).toBe(true);
-    expect(bobHistory.body.some((t) => t.type === "TRANSFER_IN")).toBe(true);
+    expect(aliceHistory.body.data.some((t) => t.type === "TRANSFER_OUT")).toBe(true);
+    expect(bobHistory.body.data.some((t) => t.type === "TRANSFER_IN")).toBe(true);
   });
 
   test("rejects a transfer with insufficient balance", async () => {
@@ -156,8 +177,8 @@ describe("Transfers", () => {
 
     const a = await request(app).get(`/api/users/${alice.id}/balance`);
     const b = await request(app).get(`/api/users/${bob.id}/balance`);
-    expect(a.body.balance).toBe(10);
-    expect(b.body.balance).toBe(5);
+    expect(a.body.data.balance).toBe(10);
+    expect(b.body.data.balance).toBe(5);
   });
 });
 
@@ -176,7 +197,7 @@ describe("Group expenses - equal split", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.splits.map((s) => s.amount)).toEqual([3.34, 3.33, 3.33]);
+    expect(res.body.data.splits.map((s) => s.amount)).toEqual([3.34, 3.33, 3.33]);
   });
 
   test("debits the payer and records shares for every participant", async () => {
@@ -192,12 +213,12 @@ describe("Group expenses - equal split", () => {
 
     const payerBalance = await request(app).get(`/api/users/${payer.id}/balance`);
     const bobBalance = await request(app).get(`/api/users/${bob.id}/balance`);
-    expect(payerBalance.body.balance).toBe(60);
-    expect(bobBalance.body.balance).toBe(0); // shares are informational, not auto-debited
+    expect(payerBalance.body.data.balance).toBe(60);
+    expect(bobBalance.body.data.balance).toBe(0); // shares are informational, not auto-debited
 
     const bobHistory = await request(app).get(`/api/users/${bob.id}/transactions`);
-    expect(bobHistory.body).toHaveLength(1);
-    expect(bobHistory.body[0]).toMatchObject({
+    expect(bobHistory.body.data).toHaveLength(1);
+    expect(bobHistory.body.data[0]).toMatchObject({
       type: "EXPENSE_SHARE",
       amount: 20,
       relatedUserId: payer.id,
@@ -207,7 +228,7 @@ describe("Group expenses - equal split", () => {
 
     // The payer's own share is not a debt to anyone
     const payerHistory = await request(app).get(`/api/users/${payer.id}/transactions`);
-    const ownShare = payerHistory.body.find((t) => t.type === "EXPENSE_SHARE");
+    const ownShare = payerHistory.body.data.find((t) => t.type === "EXPENSE_SHARE");
     expect(ownShare).toMatchObject({
       amount: 20,
       relatedUserId: null,
@@ -223,9 +244,9 @@ describe("Group expenses - equal split", () => {
       totalAmount: 10,
     });
 
-    const res = await request(app).get(`/api/expenses/${created.body.id}`);
+    const res = await request(app).get(`/api/expenses/${created.body.data.id}`);
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(created.body);
+    expect(res.body.data).toEqual(created.body.data);
 
     const missing = await request(app).get("/api/expenses/nope");
     expect(missing.status).toBe(404);
@@ -297,7 +318,7 @@ describe("Expense settlement (transfer with expenseId)", () => {
       participantIds: [alice.id, bob.id, carol.id],
       totalAmount: 30,
     });
-    return { alice, bob, carol, expenseId: expense.body.id };
+    return { alice, bob, carol, expenseId: expense.body.data.id };
   }
 
   test("accepts partial payments up to the outstanding share, then rejects more", async () => {
@@ -307,7 +328,7 @@ describe("Expense settlement (transfer with expenseId)", () => {
       .post("/api/transfers")
       .send({ fromUserId: bob.id, toUserId: alice.id, amount: 4, expenseId });
     expect(first.status).toBe(200);
-    expect(first.body.expenseId).toBe(expenseId);
+    expect(first.body.data.expenseId).toBe(expenseId);
 
     const second = await request(app)
       .post("/api/transfers")
@@ -357,7 +378,7 @@ describe("Expense settlement (transfer with expenseId)", () => {
     expect(res.status).toBe(404);
 
     const bobBalance = await request(app).get(`/api/users/${bob.id}/balance`);
-    expect(bobBalance.body.balance).toBe(50);
+    expect(bobBalance.body.data.balance).toBe(50);
   });
 });
 
@@ -388,19 +409,19 @@ describe("Debts", () => {
     // Bob settles 4 of exp1 only
     await request(app)
       .post("/api/transfers")
-      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 4, expenseId: exp1.body.id });
+      .send({ fromUserId: bob.id, toUserId: alice.id, amount: 4, expenseId: exp1.body.data.id });
     // A plain transfer to Carol is not a settlement
     await request(app).post("/api/transfers").send({ fromUserId: bob.id, toUserId: carol.id, amount: 3 });
 
     const res = await request(app).get(`/api/users/${bob.id}/debts`);
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
+    expect(res.body.data).toEqual({
       userId: bob.id,
       totalOutstanding: 36,
       debts: [
-        { expenseId: exp1.body.id, toUserId: alice.id, toUserName: "Alice", owed: 10, settled: 4, outstanding: 6 },
-        { expenseId: exp2.body.id, toUserId: alice.id, toUserName: "Alice", owed: 20, settled: 0, outstanding: 20 },
-        { expenseId: exp3.body.id, toUserId: carol.id, toUserName: "Carol", owed: 10, settled: 0, outstanding: 10 },
+        { expenseId: exp1.body.data.id, toUserId: alice.id, toUserName: "Alice", owed: 10, settled: 4, outstanding: 6 },
+        { expenseId: exp2.body.data.id, toUserId: alice.id, toUserName: "Alice", owed: 20, settled: 0, outstanding: 20 },
+        { expenseId: exp3.body.data.id, toUserId: carol.id, toUserName: "Carol", owed: 10, settled: 0, outstanding: 10 },
       ],
     });
   });
@@ -415,7 +436,7 @@ describe("Debts", () => {
     });
 
     const res = await request(app).get(`/api/users/${alice.id}/debts`);
-    expect(res.body).toEqual({ userId: alice.id, totalOutstanding: 0, debts: [] });
+    expect(res.body.data).toEqual({ userId: alice.id, totalOutstanding: 0, debts: [] });
   });
 
   test("404s for an unknown user", async () => {
@@ -441,7 +462,7 @@ describe("Group expenses - custom split", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.splits).toEqual(
+    expect(res.body.data.splits).toEqual(
       expect.arrayContaining([
         { userId: payer.id, amount: 60 },
         { userId: bob.id, amount: 40 },
@@ -516,8 +537,8 @@ describe("Group expenses - custom split", () => {
     });
 
     const balance = await request(app).get(`/api/users/${payer.id}/balance`);
-    expect(balance.body.balance).toBe(100);
+    expect(balance.body.data.balance).toBe(100);
     const history = await request(app).get(`/api/users/${payer.id}/transactions`);
-    expect(history.body.map((t) => t.type)).toEqual(["INITIAL_BALANCE"]);
+    expect(history.body.data.map((t) => t.type)).toEqual(["INITIAL_BALANCE"]);
   });
 });

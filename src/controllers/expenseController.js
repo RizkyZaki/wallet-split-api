@@ -1,13 +1,12 @@
 const expenseService = require("../services/expenseService");
+const { ok } = require("../utils/response");
 
 function createExpense(req, res) {
-  const expense = expenseService.createExpense(req.body || {});
-  res.status(201).json(expense);
+  ok(res, expenseService.createExpense(req.body || {}), 201);
 }
 
 function getExpense(req, res) {
-  const expense = expenseService.getExpense(req.params.id);
-  res.status(200).json(expense);
+  ok(res, expenseService.getExpense(req.params.id));
 }
 
 module.exports = { createExpense, getExpense };

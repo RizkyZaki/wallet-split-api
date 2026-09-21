@@ -26,7 +26,7 @@ npm start
 ```bash
 npm install
 npm test
-# Test Suites: 3 passed, Tests: 47 passed
+# Test Suites: 3 passed, Tests: 50 passed
 ```
 
 Tidak ada konfigurasi tambahan. Data hanya tersimpan di memori dan akan
@@ -77,6 +77,16 @@ curl -s $BASE/users/$BOB/transactions
 Semua request dan response menggunakan JSON. Nilai uang berupa angka biasa
 dengan maksimal dua angka di belakang koma (contoh: `10.5`).
 
+Setiap response memakai amplop yang sama. Sukses:
+```json
+{ "success": true, "data": { ... } }
+```
+Gagal:
+```json
+{ "success": false, "error": "pesan" }
+```
+Contoh `data` di bawah ini adalah isi field `data` tersebut.
+
 ### Membuat wallet
 
 `POST /api/users`
@@ -85,7 +95,7 @@ dengan maksimal dua angka di belakang koma (contoh: `10.5`).
 ```
 `initialBalance` opsional, default `0`. Response `201`:
 ```json
-{ "id": "user_...", "name": "Alice", "balance": 100 }
+{ "success": true, "data": { "id": "user_...", "name": "Alice", "balance": 100 } }
 ```
 
 ### Top-up saldo
@@ -172,7 +182,8 @@ perhitungan.
 
 ### Format error
 
-Semua error berbentuk `{ "error": "pesan" }` dengan status HTTP yang sesuai:
+Semua error berbentuk `{ "success": false, "error": "pesan" }` dengan status
+HTTP yang sesuai:
 `400` untuk kegagalan validasi (termasuk body JSON yang tidak valid), `404`
 untuk user atau expense yang tidak ditemukan, `500` hanya untuk error
 internal yang tidak terduga.
@@ -244,11 +255,14 @@ urutan validasi-dulu-baru-mutasi, setiap request efektif bersifat atomik.
 Jika berpindah ke database sungguhan, jaminan ini perlu dipertahankan dengan
 transaksi eksplisit dan row locking (atau optimistic versioning).
 
-**Penanganan error.** Satu class `AppError` membawa status HTTP dan ditangkap
-oleh satu middleware error Express. Error validasi dari semua service karena
-itu punya bentuk `{ "error": "..." }` yang sama tanpa `try/catch` di tiap
-route. Exception tak terduga dicatat ke log dan dikembalikan sebagai `500`
-generik agar detail internal tidak bocor.
+**Penanganan error dan amplop response.** Satu class `AppError` membawa status
+HTTP dan ditangkap oleh satu middleware error Express. Error validasi dari
+semua service karena itu punya bentuk `{ "success": false, "error": "..." }`
+yang sama tanpa `try/catch` di tiap route. Exception tak terduga dicatat ke
+log dan dikembalikan sebagai `500` generik agar detail internal tidak bocor.
+Response sukses dibungkus `{ "success": true, "data": ... }` lewat helper di
+`src/utils/response.js`, sehingga client cukup memeriksa `success` tanpa
+harus membaca status HTTP terlebih dahulu.
 
 ## Struktur project
 
@@ -260,6 +274,7 @@ src/
   utils/
     money.js                    # aritmetika berbasis sen
     validation.js               # assertion input yang dipakai bersama
+    response.js                 # amplop response { success, data | error }
   errors/AppError.js
   services/
     userService.js              # create, top-up, saldo, riwayat, utang, cek debit/kredit
